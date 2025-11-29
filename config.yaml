@@ -1,0 +1,33 @@
+paths:
+  input_dir: "input"
+  output_dir: "output"
+  temp_dir: "temp"
+
+whisper:
+  model_size: "large-v3" # Updated to latest model for better accuracy
+  device: "cuda" # or "cpu"
+  compute_type: "float16" # or "int8"
+  batch_size: 16
+
+analysis:
+  min_clip_duration: 15
+  max_clip_duration: 60
+  sentiment_threshold: 0.75 # Increased for viral content (High absolute score)
+  hook_threshold: 0.5 # Threshold for sharp sentiment change (Hook detection)
+
+llm:
+  provider: "lm_studio" # or "openai", "openrouter"
+  base_url: "http://localhost:1234/v1"
+  model: "local-model" # Update with your loaded model name
+  temperature: 0.7
+
+cropping:
+  face_tracking: true
+  padding_blur: true
+  # One Euro Filter parameters for smooth tracking
+  min_cutoff: 0.05
+  beta: 0.5
+
+b_roll:
+  enabled: true
+

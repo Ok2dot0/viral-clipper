@@ -1,0 +1,28 @@
+# Core AI/ML
+torch
+torchaudio
+torchvision
+git+https://github.com/m-bain/whisperx.git
+
+# Video/Audio Processing
+ffmpeg-python
+opencv-python
+moviepy
+mediapipe
+
+# NLP & Analysis
+nltk
+vaderSentiment
+rake-nltk
+
+# Utilities
+requests
+pyyaml
+python-dotenv
+pexels-api-py
+tqdm
+gradio
+yt-dlp
+
+
+pexels_api

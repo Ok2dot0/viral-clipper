@@ -1,0 +1,29 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,80,&H00FFFF,&HFFFFFF,&H000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,2,2,20,20,150,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:01.24,Default,,0,0,0,,{\k62}carplay {\k7}and {\k27}android {\k15}auto
+Dialogue: 0,0:00:01.28,0:00:01.90,Default,,0,0,0,,{\k4}i {\k12}don't {\k12}think {\k22}my
+Dialogue: 0,0:00:01.96,0:00:02.54,Default,,0,0,0,,{\k42}understanding {\k4}is {\k3}it
+Dialogue: 0,0:00:02.56,0:00:03.62,Default,,0,0,0,,{\k18}doesn't {\k18}cost {\k30}anything {\k12}my
+Dialogue: 0,0:00:03.64,0:00:04.48,Default,,0,0,0,,{\k48}understanding {\k7}is {\k18}that
+Dialogue: 0,0:00:04.52,0:00:05.35,Default,,0,0,0,,{\k42}google {\k2}i {\k12}don't {\k8}know
+Dialogue: 0,0:00:05.39,0:00:06.69,Default,,0,0,0,,{\k18}about {\k24}apple {\k15}but {\k6}on
+Dialogue: 0,0:00:06.73,0:00:07.69,Default,,0,0,0,,{\k5}the {\k30}google {\k24}side {\k14}my
+Dialogue: 0,0:00:07.75,0:00:09.09,Default,,0,0,0,,{\k62}understanding {\k6}is {\k24}that {\k6}it
+Dialogue: 0,0:00:09.17,0:00:10.39,Default,,0,0,0,,{\k6}is {\k14}so {\k58}beneficial {\k19}from
+Dialogue: 0,0:00:10.41,0:00:11.92,Default,,0,0,0,,{\k4}an {\k76}ecosystem {\k7}and {\k24}data
+Dialogue: 0,0:00:11.96,0:00:13.10,Default,,0,0,0,,{\k45}collection {\k48}standpoint {\k12}that
+Dialogue: 0,0:00:13.12,0:00:14.10,Default,,0,0,0,,{\k10}they {\k12}will {\k44}basically {\k18}like
+Dialogue: 0,0:00:14.52,0:00:15.06,Default,,0,0,0,,{\k15}help {\k9}you {\k10}do {\k4}it
+Dialogue: 0,0:00:16.07,0:00:17.11,Default,,0,0,0,,{\k7}is {\k14}my {\k52}understanding {\k10}but
+Dialogue: 0,0:00:17.17,0:00:17.77,Default,,0,0,0,,{\k4}i {\k13}could {\k8}be {\k18}wrong
+Dialogue: 0,0:00:17.81,0:00:18.41,Default,,0,0,0,,{\k18}about {\k14}that {\k7}yeah {\k2}i
+Dialogue: 0,0:00:18.43,0:00:20.86,Default,,0,0,0,,{\k10}don't {\k14}know {\k18}um {\k56}interesting

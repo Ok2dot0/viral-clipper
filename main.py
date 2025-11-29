@@ -91,8 +91,10 @@ def main():
             crop_data = cropping.calculate_crop_coordinates(
                 video_path, 
                 best_clip['start'], 
-                best_clip['end']
+                best_clip['end'],
+                debug=True # Enable debug visualization
             )
+            print(f"Debug video saved to temp/debug_tracking.mp4")
             
             # Step 4.5: B-Roll Acquisition
             b_roll_paths = []

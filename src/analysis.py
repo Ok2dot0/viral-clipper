@@ -117,7 +117,6 @@ Candidates:
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.2, # Lower temperature for more deterministic selection
-        "max_tokens": 500,
         "stream": False
     }
     

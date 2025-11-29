@@ -73,19 +73,41 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         for e in events:
             f.write(e + "\n")
 
-def generate_crop_expression(crop_data, duration):
+def generate_crop_expression(crop_data, duration, start_time_offset):
     """
     Generates an FFmpeg expression for dynamic cropping (x-coordinate).
     Uses piecewise linear interpolation.
     """
+    print(f"[DEBUG] Generating crop expression. Total points: {len(crop_data) if crop_data else 0}")
+    print(f"[DEBUG] Clip Start: {start_time_offset}, Duration: {duration}")
+
     if not crop_data:
+        print("[DEBUG] No crop data provided. Using default 0.")
         return "0"
         
-    # Downsample to avoid huge expressions (1 point every 0.5s)
+    # Downsample to avoid huge expressions (1 point every 0.2s for smoother tracking)
     points = []
     last_t = -1
+    
+    # Filter points relevant to this clip and normalize time
+    valid_points = []
     for c in crop_data:
-        if c['time'] - last_t >= 0.5:
+        # Normalize time to start from 0 for the clip
+        rel_time = c['time'] - start_time_offset
+        if 0 <= rel_time <= duration:
+            valid_points.append({**c, 'time': rel_time})
+            
+    print(f"[DEBUG] Valid points within clip duration: {len(valid_points)}")
+    if valid_points:
+        print(f"[DEBUG] First valid point: {valid_points[0]}")
+        print(f"[DEBUG] Last valid point: {valid_points[-1]}")
+
+    if not valid_points:
+        print(f"[DEBUG] No valid points found in range. Using first crop point: {crop_data[0]['x']}")
+        return str(crop_data[0]['x'])
+
+    for c in valid_points:
+        if c['time'] - last_t >= 0.2: # Increased resolution to 0.2s
             points.append(c)
             last_t = c['time']
             
@@ -95,11 +117,12 @@ def generate_crop_expression(crop_data, duration):
     if points[-1]['time'] < duration:
         points.append({**points[-1], 'time': duration})
         
-    # Build expression: if(between(t,t0,t1), lerp(x0,x1,(t-t0)/(t1-t0)), ...)
-    expr = str(points[-1]['x']) # Default/Fallback
+    # Build expression: sum of segments
+    # We use summation instead of nested if() to avoid recursion depth limits and reduce string length overhead.
+    # Logic: sum( (t >= t0 and t < t1) * lerp(...) )
+    segments = []
     
-    # Build from end to start to nest correctly
-    for i in range(len(points)-2, -1, -1):
+    for i in range(len(points)-1):
         p0 = points[i]
         p1 = points[i+1]
         t0 = p0['time']
@@ -108,11 +131,30 @@ def generate_crop_expression(crop_data, duration):
         x1 = p1['x']
         
         # Avoid division by zero
-        if t1 == t0: continue
+        if t1 <= t0: continue
         
+        # Condition: Active during this segment
+        # For the last segment, we include the end time (lte) to ensure the final frame is covered.
+        # For others, we use strictly less than (lt) to avoid double-counting at the boundary where t == t1.
+        if i == len(points) - 2:
+            cond = f"between(t,{t0},{t1})" # inclusive [t0, t1]
+        else:
+            cond = f"(gte(t,{t0})*lt(t,{t1}))" # [t0, t1)
+            
+        # Interpolation
+        # We wrap lerp in parentheses just in case
         segment_expr = f"lerp({x0},{x1},(t-{t0})/{t1-t0})"
-        expr = f"if(between(t,{t0},{t1}),{segment_expr},{expr})"
         
+        segments.append(f"{cond}*{segment_expr}")
+        
+    if not segments:
+        return str(crop_data[0]['x'])
+        
+    # Join all segments with +
+    expr = "+".join(segments)
+        
+    print(f"[DEBUG] Generated Expression Length: {len(expr)}")
+    # print(f"[DEBUG] Expression Preview: {expr[:200]}...")
     return expr
 
 def render_clip(video_path, start_time, end_time, crop_data, transcript_segments, output_path, b_roll_paths=None):
@@ -141,12 +183,15 @@ def render_clip(video_path, start_time, end_time, crop_data, transcript_segments
     if crop_data:
         crop_w = crop_data[0]['w']
         crop_h = crop_data[0]['h']
-        x_expr = generate_crop_expression(crop_data, duration)
+        # Pass start_time to normalize timestamps
+        x_expr = generate_crop_expression(crop_data, duration, start_time)
     else:
         crop_w = 608
         crop_h = 1080
         x_expr = "0"
         
+    print(f"[DEBUG] Final Crop Expression: {x_expr[:500]}...")
+
     # 3. Build FFmpeg command
     try:
         input_stream = ffmpeg.input(video_path, ss=start_time, t=duration)
@@ -161,6 +206,9 @@ def render_clip(video_path, start_time, end_time, crop_data, transcript_segments
         )
         
         # Foreground Layer (Dynamic Crop)
+        # IMPORTANT: The crop filter in ffmpeg evaluates expressions per frame.
+        # We must ensure 't' is relative to the start of the filter chain.
+        # When using ss/t in input, the timestamps in the filter chain usually start from 0.
         foreground = (
             input_stream
             .crop(x=x_expr, y=0, width=int(crop_w), height=int(crop_h))
@@ -209,10 +257,12 @@ def render_clip(video_path, start_time, end_time, crop_data, transcript_segments
         )
         
         print(f"Rendering clip to {output_path} with dynamic features...")
-        stream.run(quiet=True)
+        # Enable verbose logging for debugging
+        stream.run(quiet=False) 
         print("Rendering complete.")
         
     except ffmpeg.Error as e:
-        print(f"Error rendering clip: {e.stderr.decode('utf8')}")
+        error_message = e.stderr.decode('utf8') if e.stderr else "Unknown FFmpeg error (no stderr)"
+        print(f"Error rendering clip: {error_message}")
         raise
 

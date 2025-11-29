@@ -15,7 +15,7 @@ def load_config(config_path="config.yaml"):
 
 config = load_config()
 
-def process_video(video_file, youtube_url, min_duration, max_duration, sentiment_threshold, use_llm):
+def process_video(video_file, youtube_url, min_duration, max_duration, sentiment_threshold, use_llm, debug_mode):
     """
     Process a single video file and return the path to the generated short.
     """
@@ -28,17 +28,17 @@ def process_video(video_file, youtube_url, min_duration, max_duration, sentiment
     
     # Handle Input Source
     if youtube_url and youtube_url.strip():
-        yield None, log(f"Downloading video from YouTube: {youtube_url}...")
+        yield None, None, log(f"Downloading video from YouTube: {youtube_url}...")
         try:
             video_path = ingestion.download_youtube_video(youtube_url, config['paths']['input_dir'])
-            yield None, log(f"Downloaded: {os.path.basename(video_path)}")
+            yield None, None, log(f"Downloaded: {os.path.basename(video_path)}")
         except Exception as e:
-            yield None, log(f"Error downloading YouTube video: {e}")
-            return None, "\n".join(status_log)
+            yield None, None, log(f"Error downloading YouTube video: {e}")
+            return None, None, "\n".join(status_log)
     elif video_file is not None:
         video_path = video_file.name
     else:
-        return None, "No video file or YouTube URL provided."
+        return None, None, "No video file or YouTube URL provided."
 
     temp_dir = config['paths']['temp_dir']
     output_dir = config['paths']['output_dir']
@@ -47,22 +47,22 @@ def process_video(video_file, youtube_url, min_duration, max_duration, sentiment
     os.makedirs(output_dir, exist_ok=True)
     
     try:
-        yield None, log(f"Processing {os.path.basename(video_path)}...")
+        yield None, None, log(f"Processing {os.path.basename(video_path)}...")
         
         # Step 1: Ingestion
         audio_path = os.path.join(temp_dir, f"{os.path.splitext(os.path.basename(video_path))[0]}.wav")
         if not os.path.exists(audio_path):
-            yield None, log("Extracting audio...")
+            yield None, None, log("Extracting audio...")
             ingestion.extract_audio(video_path, audio_path)
         
         # Step 2: Transcription
         transcript_path = os.path.join(temp_dir, f"{os.path.splitext(os.path.basename(video_path))[0]}_transcript.json")
         if os.path.exists(transcript_path):
-            yield None, log("Loading existing transcript...")
+            yield None, None, log("Loading existing transcript...")
             with open(transcript_path, 'r') as f:
                 transcript_result = json.load(f)
         else:
-            yield None, log("Transcribing audio (this may take a while)...")
+            yield None, None, log("Transcribing audio (this may take a while)...")
             transcript_result = transcription.transcribe_audio(
                 audio_path, 
                 model_size=config['whisper']['model_size'],
@@ -74,7 +74,7 @@ def process_video(video_file, youtube_url, min_duration, max_duration, sentiment
                 json.dump(transcript_result, f)
         
         # Step 3: Analysis
-        yield None, log("Analyzing for viral moments...")
+        yield None, None, log("Analyzing for viral moments...")
         potential_clips = analysis.analyze_transcript(
             transcript_result['segments'],
             min_duration=min_duration,
@@ -83,31 +83,42 @@ def process_video(video_file, youtube_url, min_duration, max_duration, sentiment
         )
         
         if not potential_clips:
-            yield None, log("No suitable clips found based on criteria.")
-            return None, "\n".join(status_log)
+            yield None, None, log("No suitable clips found based on criteria.")
+            return None, None, "\n".join(status_log)
             
         # Select best clip
         if use_llm and config['llm']['provider'] != "none":
-            yield None, log("Selecting best clip with LLM...")
+            yield None, None, log("Selecting best clip with LLM...")
             best_clip = analysis.select_best_clip_with_llm(potential_clips, config['llm'])
         else:
             best_clip = potential_clips[0]
             
-        yield None, log(f"Selected Clip: {best_clip['text'][:50]}... (Score: {best_clip['score']:.2f})")
+        yield None, None, log(f"Selected Clip: {best_clip['text'][:50]}... (Score: {best_clip['score']:.2f})")
         
         # Step 4: Cropping
-        yield None, log("Calculating crop coordinates...")
+        yield None, None, log("Calculating crop coordinates...")
         crop_data = cropping.calculate_crop_coordinates(
             video_path, 
             best_clip['start'], 
-            best_clip['end']
+            best_clip['end'],
+            debug=debug_mode
         )
         
+        debug_video_path = None
+        if debug_mode:
+            # Assuming cropping.py saves to temp/debug_tracking.mp4
+            # We should probably move/rename it to avoid overwrites if we were concurrent, 
+            # but for now let's just use it.
+            potential_debug_path = os.path.join(temp_dir, "debug_tracking.mp4")
+            if os.path.exists(potential_debug_path):
+                debug_video_path = potential_debug_path
+                yield None, debug_video_path, log("Debug video generated.")
+
         # Step 5: Rendering
         output_filename = f"{os.path.splitext(os.path.basename(video_path))[0]}_short.mp4"
         output_path = os.path.join(output_dir, output_filename)
         
-        yield None, log(f"Rendering clip to {output_path}...")
+        yield None, debug_video_path, log(f"Rendering clip to {output_path}...")
         rendering.render_clip(
             video_path,
             best_clip['start'],
@@ -117,12 +128,12 @@ def process_video(video_file, youtube_url, min_duration, max_duration, sentiment
             output_path
         )
         
-        yield output_path, log("Processing complete!")
+        yield output_path, debug_video_path, log("Processing complete!")
         
     except Exception as e:
         import traceback
         traceback.print_exc()
-        yield None, log(f"Error: {str(e)}")
+        yield None, None, log(f"Error: {str(e)}")
 
 # Gradio Interface
 with gr.Blocks(title="AI Video Repurposing Engine") as app:
@@ -139,17 +150,19 @@ with gr.Blocks(title="AI Video Repurposing Engine") as app:
                 max_duration = gr.Slider(minimum=15, maximum=120, value=60, step=1, label="Max Clip Duration (s)")
                 sentiment_threshold = gr.Slider(minimum=0.0, maximum=1.0, value=0.6, step=0.1, label="Sentiment Threshold")
                 use_llm = gr.Checkbox(label="Use LLM for Selection", value=True)
+                debug_mode = gr.Checkbox(label="Enable Debug Mode (Show Tracking)", value=False)
             
             generate_btn = gr.Button("Generate Short", variant="primary")
         
         with gr.Column():
             video_output = gr.Video(label="Generated Short")
+            debug_output = gr.Video(label="Debug Tracking View")
             status_output = gr.Textbox(label="Status Log", lines=10)
 
     generate_btn.click(
         fn=process_video,
-        inputs=[video_input, youtube_url_input, min_duration, max_duration, sentiment_threshold, use_llm],
-        outputs=[video_output, status_output]
+        inputs=[video_input, youtube_url_input, min_duration, max_duration, sentiment_threshold, use_llm, debug_mode],
+        outputs=[video_output, debug_output, status_output]
     )
 
 if __name__ == "__main__":

@@ -1,1 +1,8 @@
 /.env
+input/*
+output/*
+*.log
+*.pyc
+__pycache__/
+temp/*
+src/__pycache__/*
